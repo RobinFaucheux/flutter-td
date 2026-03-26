@@ -20,8 +20,8 @@ class Task {
     return Task(id: nb, title: 'title $nb', tags: ['tags $nb'], nbhours: nb, difficuty: nb%5, description: 'description $nb');
   }
 
-  Map<String, Object?> toMap(){
-    return {'id':id, 'title':title, 'tags': tags, 'nbhours':nbhours, 'difficuty':difficuty, 'description':description};
+  Map<String, Object?> toMap(){ // TODO remettre et fix les tags
+    return {'id':id, 'title':title, 'nbhours':nbhours, 'difficuty':difficuty, 'description':description};
   }
 
 

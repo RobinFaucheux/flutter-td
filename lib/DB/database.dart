@@ -1,6 +1,10 @@
 import 'dart:async';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import '../model/tasks.dart';
 
 class DatabaseHelper {
@@ -16,6 +20,15 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDatabase() async {
+    if (kIsWeb)
+      {
+        databaseFactory = databaseFactoryFfiWeb;
+      }
+    else if (Platform.isWindows || Platform.isLinux) {
+      sqfliteFfiInit();
+      databaseFactory = databaseFactoryFfi;
+    }
+
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, 'task_database.db');
 
@@ -90,10 +103,16 @@ class DatabaseHelper {
     final db = await instance.database;
     final List<Map<String, dynamic>> maps = await db.query('Task');
 
-    return [
-      for (final {'id' : id as int, 'tite' : title as String, 'tags' : tags as List<String> , 'nbhours' : nbhours as int, 'difficuty':difficuty as int, 'description' : description as String} in maps)
-        Task(id: id, title: title, tags: tags, nbhours: nbhours, difficuty: difficuty, description: description)
-    ];
+    return List.generate(maps.length, (i) {
+      return Task(
+        id: maps[i]['id'] as int,
+        title: maps[i]['title'] as String,
+        description: maps[i]['description'] as String,
+        difficuty: maps[i]['difficuty'] as int,
+        nbhours: maps[i]['nbhours'] as int,
+        tags: [], // TODO a rajouter
+      );
+    });
   }
 }
 
