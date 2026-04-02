@@ -20,11 +20,9 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDatabase() async {
-    if (kIsWeb)
-      {
-        databaseFactory = databaseFactoryFfiWeb;
-      }
-    else if (Platform.isWindows || Platform.isLinux) {
+    if (kIsWeb) {
+      databaseFactory = databaseFactoryFfiWeb;
+    } else if (Platform.isWindows || Platform.isLinux) {
       sqfliteFfiInit();
       databaseFactory = databaseFactoryFfi;
     }
@@ -70,14 +68,41 @@ class DatabaseHelper {
     ''');
   }
 
-
   Future<void> insertTask(Task task) async {
     final db = await instance.database;
-    await db.insert(
+
+    int taskId = await db.insert(
       'Task',
       task.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+
+    for (String tag in task.tags) {
+      final List<Map<String, dynamic>> tagResult = await db.query(
+        'Tags',
+        where: 'name = ?',
+        whereArgs: [tag],
+      );
+
+      int tagId;
+      if (tagResult.isNotEmpty) {
+        tagId = tagResult.first['id'] as int;
+      } else {
+        tagId = await db.insert(
+          'Tags',
+          {'name': tag},
+        );
+      }
+
+      await db.insert(
+        'TaskTags',
+        {
+          'TaskId': taskId,
+          'TagId': tagId,
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
   }
 
   Future<void> updateTask(Task task) async {
@@ -101,18 +126,33 @@ class DatabaseHelper {
 
   Future<List<Task>> getAllTasks() async {
     final db = await instance.database;
-    final List<Map<String, dynamic>> maps = await db.query('Task');
+    final List<Map<String, dynamic>> taskMaps = await db.query('Task');
 
-    return List.generate(maps.length, (i) {
-      return Task(
-        id: maps[i]['id'] as int,
-        title: maps[i]['title'] as String,
-        description: maps[i]['description'] as String,
-        difficuty: maps[i]['difficuty'] as int,
-        nbhours: maps[i]['nbhours'] as int,
-        tags: [], // TODO a rajouter
-      );
-    });
+    List<Task> tasks = [];
+
+    for (var taskMap in taskMaps) {
+      int taskId = taskMap['id'] as int;
+
+      final List<Map<String, dynamic>> tagMaps = await db.rawQuery('''
+        SELECT Tags.name 
+        FROM Tags 
+        INNER JOIN TaskTags ON Tags.id = TaskTags.TagId 
+        WHERE TaskTags.TaskId = ?
+      ''', [taskId]);
+
+      List<String> tagsList = tagMaps.map((t) => t['name'] as String).toList();
+
+      tasks.add(Task(
+        id: taskId,
+        title: taskMap['title'] as String,
+        description: taskMap['description'] as String,
+        difficuty: taskMap['difficuty'] as int,
+        nbhours: taskMap['nbhours'] as int,
+        tags: tagsList,
+      ));
+    }
+
+    return tasks;
   }
 }
 
